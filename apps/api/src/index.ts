@@ -3,6 +3,10 @@ import cors from "@fastify/cors";
 import rateLimit from "@fastify/rate-limit";
 import swagger from "@fastify/swagger";
 import swaggerUi from "@fastify/swagger-ui";
+import { webhookRoutes } from "./routes/webhooks";
+import { tenantRoutes } from "./routes/tenants";
+import { onboardingRoutes } from "./routes/onboarding";
+import { invitationRoutes } from "./routes/invitations";
 
 const app = Fastify({
   logger: true,
@@ -35,6 +39,11 @@ async function main() {
   app.get("/health", async () => {
     return { status: "ok", timestamp: new Date().toISOString() };
   });
+
+  await app.register(webhookRoutes);
+  await app.register(tenantRoutes);
+  await app.register(onboardingRoutes);
+  await app.register(invitationRoutes);
 
   try {
     await app.listen({ port: 4000, host: "0.0.0.0" });
