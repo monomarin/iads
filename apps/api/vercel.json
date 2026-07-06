@@ -1,0 +1,9 @@
+{
+  "buildCommand": "cd ../.. && pnpm build --filter=@raemonorepo/api...",
+  "installCommand": "cd ../.. && pnpm install",
+  "outputDirectory": "api",
+  "framework": null,
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/api/index" }
+  ]
+}

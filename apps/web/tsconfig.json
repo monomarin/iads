@@ -17,6 +17,9 @@
       "@raemonorepo/ui": [
         "../../packages/ui/src"
       ],
+      "@raemonorepo/db": [
+        "../../packages/db/src"
+      ],
       "@raemonorepo/shared": [
         "../../packages/shared/src"
       ]
