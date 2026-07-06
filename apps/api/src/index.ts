@@ -1,6 +1,7 @@
 import Fastify from "fastify";
 import cors from "@fastify/cors";
 import rateLimit from "@fastify/rate-limit";
+import multipart from "@fastify/multipart";
 import swagger from "@fastify/swagger";
 import swaggerUi from "@fastify/swagger-ui";
 import { webhookRoutes } from "./routes/webhooks";
@@ -8,6 +9,9 @@ import { tenantRoutes } from "./routes/tenants";
 import { onboardingRoutes } from "./routes/onboarding";
 import { invitationRoutes } from "./routes/invitations";
 import { campaignRoutes } from "./routes/campaigns";
+import { audioRoutes } from "./routes/audio";
+import { playlistRoutes } from "./routes/playlists";
+import { smartDJRoutes } from "./routes/smartdj";
 
 const app = Fastify({
   logger: true,
@@ -22,6 +26,12 @@ async function main() {
   await app.register(rateLimit, {
     max: 100,
     timeWindow: "1 minute",
+  });
+
+  await app.register(multipart, {
+    limits: {
+      fileSize: 50 * 1024 * 1024, // 50MB max
+    },
   });
 
   await app.register(swagger, {
@@ -46,6 +56,9 @@ async function main() {
   await app.register(onboardingRoutes);
   await app.register(invitationRoutes);
   await app.register(campaignRoutes);
+  await app.register(audioRoutes);
+  await app.register(playlistRoutes);
+  await app.register(smartDJRoutes);
 
   try {
     await app.listen({ port: 4000, host: "0.0.0.0" });
