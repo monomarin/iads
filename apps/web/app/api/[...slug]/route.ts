@@ -1,28 +1,36 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
 import { db, analyticsDaily, syncLogs, edgeNodes, stores, campaigns } from "@raemonorepo/db";
 import { eq, and, desc, sql, count } from "drizzle-orm";
 
-async function getAuthContext() {
-  const session = await auth();
-  let tenantId: string | null = null;
-  let userId: string | null = null;
-  let userRole: string | null = null;
-
-  try {
-    const claims = session.sessionClaims as Record<string, unknown> | null;
-    tenantId = (claims?.tenant_id as string) ?? null;
-    userId = session.userId;
-    userRole = (claims?.role as string) ?? null;
-  } catch {
-    // token parsing failed
+function decodeToken(request: NextRequest) {
+  const authHeader = request.headers.get("authorization");
+  if (!authHeader?.startsWith("Bearer ")) {
+    return { tenantId: null, userId: null, userRole: null };
   }
 
-  return { tenantId, userId, userRole };
+  const token = authHeader.slice(7);
+  try {
+    const parts = token.split(".");
+    if (parts.length !== 3) {
+      return { tenantId: null, userId: null, userRole: null };
+    }
+
+    const payload = JSON.parse(
+      Buffer.from(parts[1]!, "base64").toString("utf-8"),
+    );
+
+    return {
+      tenantId: (payload.tenant_id as string) ?? null,
+      userId: (payload.sub as string) ?? null,
+      userRole: (payload.role as string) ?? null,
+    };
+  } catch {
+    return { tenantId: null, userId: null, userRole: null };
+  }
 }
 
-async function handleAnalyticsOverview(): Promise<NextResponse> {
-  const { tenantId } = await getAuthContext();
+async function handleAnalyticsOverview(request: NextRequest): Promise<NextResponse> {
+  const { tenantId } = decodeToken(request);
   if (!tenantId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const dailyRows = await db
@@ -80,7 +88,7 @@ async function handleAnalyticsOverview(): Promise<NextResponse> {
   });
 }
 
-export async function GET(_request: NextRequest, { params }: { params: { slug: string[] } }) {
+export async function GET(request: NextRequest, { params }: { params: { slug: string[] } }) {
   const path = params.slug?.join("/") ?? "";
 
   try {
@@ -89,7 +97,7 @@ export async function GET(_request: NextRequest, { params }: { params: { slug: s
         return NextResponse.json({ status: "ok", timestamp: new Date().toISOString() });
 
       case "analytics/overview":
-        return handleAnalyticsOverview();
+        return handleAnalyticsOverview(request);
 
       default:
         return NextResponse.json({ error: "Not found" }, { status: 404 });
