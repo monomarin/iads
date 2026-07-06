@@ -40,4 +40,7 @@ export const api = {
 
   patch: (path: string, body: unknown, token?: string) =>
     apiFetch(path, { method: "PATCH", body: JSON.stringify(body), token }),
+
+  delete: (path: string, token?: string) =>
+    apiFetch(path, { method: "DELETE", token }),
 };
