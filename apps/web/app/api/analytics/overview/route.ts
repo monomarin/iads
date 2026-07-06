@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { db, analyticsDaily, syncLogs, edgeNodes, stores, campaigns } from "@raemonorepo/db";
 import { eq, and, desc, sql, count } from "drizzle-orm";
 
+const DEMO_TENANT_ID = "00000000-0000-0000-0000-000000000001";
+
 function decodeToken(request: NextRequest) {
   const authHeader = request.headers.get("authorization");
   if (!authHeader?.startsWith("Bearer ")) {
@@ -19,9 +21,12 @@ function decodeToken(request: NextRequest) {
       Buffer.from(parts[1]!, "base64").toString("utf-8"),
     );
 
+    const customTenantId = (payload.tenant_id ?? payload.org_id ?? null) as string | null;
+    const userId = (payload.sub as string) ?? null;
+
     return {
-      tenantId: (payload.tenant_id ?? payload.org_id ?? null) as string | null,
-      userId: (payload.sub as string) ?? null,
+      tenantId: customTenantId ?? (userId ? DEMO_TENANT_ID : null),
+      userId,
       userRole: (payload.role as string) ?? null,
     };
   } catch {
