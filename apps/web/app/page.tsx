@@ -1,5 +1,5 @@
-import { DashboardSkeleton } from "@/components/skeletons/dashboard-skeleton";
+import { redirect } from "next/navigation";
 
 export default function Home() {
-  return <DashboardSkeleton />;
+  redirect("/dashboard");
 }
