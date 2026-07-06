@@ -1,0 +1,32 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "jsx": "preserve",
+    "strict": true,
+    "strictNullChecks": true,
+    "noUncheckedIndexedAccess": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "incremental": true,
+    "baseUrl": ".",
+    "paths": {
+      "@raemonorepo/db": ["./packages/db/src"],
+      "@raemonorepo/db/*": ["./packages/db/src/*"],
+      "@raemonorepo/ui": ["./packages/ui/src"],
+      "@raemonorepo/ui/*": ["./packages/ui/src/*"],
+      "@raemonorepo/shared": ["./packages/shared/src"],
+      "@raemonorepo/shared/*": ["./packages/shared/src/*"],
+      "@raemonorepo/audio": ["./packages/audio/src"],
+      "@raemonorepo/audio/*": ["./packages/audio/src/*"]
+    }
+  },
+  "exclude": ["node_modules", ".turbo", "dist", ".next"]
+}

@@ -1,0 +1,12 @@
+{
+  "buildCommand": "pnpm build --filter=@raemonorepo/web...",
+  "installCommand": "pnpm install",
+  "framework": "nextjs",
+  "outputDirectory": "apps/web/.next",
+  "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "https://api.rae.app/$1"
+    }
+  ]
+}
