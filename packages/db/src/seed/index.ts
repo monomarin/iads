@@ -4,6 +4,7 @@ import { stores } from "../schema/stores";
 import { users } from "../schema/users";
 import { onboardingProgress } from "../schema/onboarding";
 import { rlsPoliciesSql } from "../rls";
+import { seedReportTemplates } from "./report-templates";
 
 const DEMO_TENANT_ID = "00000000-0000-0000-0000-000000000001";
 const DEMO_USER_ID = "00000000-0000-0000-0000-000000000002";
@@ -49,7 +50,10 @@ export async function seed() {
     data: { name: "Demo Store - Downtown", address: "123 Main St, City" },
   }).onConflictDoNothing();
 
-  console.log("Seed complete: demo tenant, store, user, and onboarding created.");
+  // Seed builtin report templates
+  await seedReportTemplates(DEMO_TENANT_ID);
+
+  console.log("Seed complete: demo tenant, store, user, onboarding, and report templates created.");
 }
 
 seed().catch(console.error);

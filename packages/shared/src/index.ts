@@ -7,3 +7,23 @@ export type {
   AudioVariant,
   VariantRole,
 } from "./types/campaign";
+export type {
+  ReportTemplate,
+  ReportInstance,
+  ReportCategory,
+  ReportWidget,
+  ReportSection,
+  ReportTemplateConfig,
+  WidgetType,
+  MetricType,
+} from "./types/report";
+export type {
+  ApprovalRequest,
+  ApprovalAuditEntry,
+  ApprovalAction,
+  ApprovalTargetType,
+  ApprovalStatus,
+} from "./types/approval";
+export type { DeprovisionStep, DeprovisionStatus } from "./types/deprovision";
+export type { McpAction } from "./types/mcp";
+export type { BackupConfig, BackupLog } from "./types/backup";
