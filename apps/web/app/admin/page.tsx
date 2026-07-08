@@ -148,28 +148,31 @@ export default function AdminDashboardPage() {
       maxZoom: 20
     }).addTo(map);
 
-    // Dynamic amber glow marker icon
-    const storeIcon = L.divIcon({
-      className: 'store-glowing-pin',
-      html: `
-        <div style="position: relative; width: 12px; height: 12px;">
-          <div style="position: absolute; top: 0; left: 0; width: 12px; height: 12px; background-color: #F59E0B; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 8px #F59E0B;"></div>
-          <div style="position: absolute; top: -6px; left: -6px; width: 24px; height: 24px; background-color: rgba(245, 158, 11, 0.4); border-radius: 50%; animation: pulse-glow 2s infinite ease-out;"></div>
-        </div>
-      `,
-      iconSize: [12, 12],
-      iconAnchor: [6, 6]
-    });
-
     // Plot each store
     storesList.forEach((store) => {
       const lat = parseFloat(store.latitude);
       const lng = parseFloat(store.longitude);
       if (isNaN(lat) || isNaN(lng)) return;
 
+      const isDemo = store.tenantId === '00000000-0000-0000-0000-000000000001';
+      const color = isDemo ? '#F59E0B' : '#10B981'; // Amber for demo, Emerald green for real clients
+      const shadowColor = isDemo ? 'rgba(245, 158, 11, 0.4)' : 'rgba(16, 185, 129, 0.4)';
+
+      const storeIcon = L.divIcon({
+        className: 'store-glowing-pin-' + (isDemo ? 'demo' : 'real'),
+        html: `
+          <div style="position: relative; width: 12px; height: 12px;">
+            <div style="position: absolute; top: 0; left: 0; width: 12px; height: 12px; background-color: ${color}; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 8px ${color};"></div>
+            <div style="position: absolute; top: -6px; left: -6px; width: 24px; height: 24px; background-color: ${shadowColor}; border-radius: 50%; animation: pulse-glow 2s infinite ease-out;"></div>
+          </div>
+        `,
+        iconSize: [12, 12],
+        iconAnchor: [6, 6]
+      });
+
       const popupContent = `
         <div style="color: #0F172A; font-family: system-ui, sans-serif; font-size: 12px; padding: 4px; line-height: 1.4;">
-          <h4 style="margin: 0 0 4px; font-weight: 800; font-size: 13px; color: #D97706;">${store.name}</h4>
+          <h4 style="margin: 0 0 4px; font-weight: 800; font-size: 13px; color: ${isDemo ? '#D97706' : '#059669'};">${store.name}</h4>
           ${store.commercialName ? `<div><b>Nombre Comercial:</b> ${store.commercialName}</div>` : ''}
           ${store.legalName ? `<div><b>Razón Social:</b> ${store.legalName}</div>` : ''}
           ${store.vertical ? `<div><b>Vertical:</b> ${store.vertical}</div>` : ''}

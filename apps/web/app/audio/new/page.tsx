@@ -34,7 +34,8 @@ export default function UploadAudioPage() {
       if (mood) formData.append("mood", mood);
       if (bpm) formData.append("bpm", bpm);
 
-      await fetch("http://localhost:4000/api/audio/upload", {
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+      await fetch(`${API_URL}/api/audio/upload`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
         body: formData,

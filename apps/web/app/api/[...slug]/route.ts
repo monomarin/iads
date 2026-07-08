@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
-import { db, tenants, stores, users, onboardingProgress } from "@raemonorepo/db";
+import { db, tenants, stores, users, onboardingProgress, audioCatalog } from "@raemonorepo/db";
 import { eq } from "drizzle-orm";
+import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 
 function daysAgo(n: number): string {
   const d = new Date();
@@ -429,6 +430,29 @@ export async function GET(_request: NextRequest, { params }: { params: { slug: s
       return NextResponse.json(progress[0]);
     }
 
+    if (path === "audio") {
+      const { userId: clerkUserId } = auth();
+      if (!clerkUserId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+      const user = await getOrProvisionUser(clerkUserId);
+      const audioList = await db
+        .select()
+        .from(audioCatalog)
+        .where(eq(audioCatalog.tenantId, user.tenantId));
+
+      const mappedList = audioList.map(t => ({
+        id: t.id,
+        name: t.name,
+        genre: t.genre,
+        mood: t.mood,
+        bpm: t.bpm,
+        duration_seconds: t.durationSeconds,
+        created_at: t.createdAt.toISOString()
+      }));
+
+      return NextResponse.json(mappedList);
+    }
+
     // Default to mock response
     return demoResponse(path);
   } catch (err: any) {
@@ -463,6 +487,54 @@ export async function POST(request: NextRequest, { params }: { params: { slug: s
       }).returning();
 
       return NextResponse.json(newStore, { status: 201 });
+    }
+
+    if (path === "audio/upload") {
+      const { userId: clerkUserId } = auth();
+      if (!clerkUserId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+      const user = await getOrProvisionUser(clerkUserId);
+      const formData = await request.formData();
+      const file = formData.get("file") as File;
+      if (!file) {
+        return NextResponse.json({ error: "No file provided" }, { status: 400 });
+      }
+
+      const buffer = Buffer.from(await file.arrayBuffer());
+      const fileName = file.name;
+      const fileKey = `${user.tenantId}/${Date.now()}-${fileName}`;
+
+      // Initialize Cloudflare R2 client
+      const r2 = new S3Client({
+        region: "auto",
+        endpoint: `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+        credentials: {
+          accessKeyId: process.env.R2_ACCESS_KEY_ID || "",
+          secretAccessKey: process.env.R2_SECRET_ACCESS_KEY || "",
+        },
+      });
+
+      // Upload file to Cloudflare R2
+      await r2.send(new PutObjectCommand({
+        Bucket: process.env.R2_BUCKET_NAME,
+        Key: fileKey,
+        Body: buffer,
+        ContentType: file.type,
+      }));
+
+      // Insert record into audioCatalog
+      const [entry] = await db.insert(audioCatalog).values({
+        tenantId: user.tenantId,
+        name: fileName.replace(/\.[^/.]+$/, ""),
+        fileKey,
+        genre: (formData.get("genre") as string) || null,
+        mood: (formData.get("mood") as string) || null,
+        bpm: formData.get("bpm") ? parseInt(formData.get("bpm") as string) : null,
+        durationSeconds: formData.get("duration") ? parseInt(formData.get("duration") as string) : null,
+        isUploaded: true,
+      }).returning();
+
+      return NextResponse.json(entry, { status: 201 });
     }
 
     if (path === "onboarding/complete") {

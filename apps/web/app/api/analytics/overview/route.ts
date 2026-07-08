@@ -1,43 +1,50 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db, analyticsDaily, syncLogs, edgeNodes, stores, campaigns } from "@raemonorepo/db";
-import { eq, and, desc, sql, count } from "drizzle-orm";
+import { db, analyticsDaily, syncLogs, edgeNodes, stores, campaigns, users, tenants } from "@raemonorepo/db";
+import { eq, and, desc, sql, count, inArray } from "drizzle-orm";
+import { auth } from "@clerk/nextjs/server";
 
-const DEMO_TENANT_ID = "00000000-0000-0000-0000-000000000001";
 
-function decodeToken(request: NextRequest) {
-  const authHeader = request.headers.get("authorization");
-  if (!authHeader?.startsWith("Bearer ")) {
-    return { tenantId: null, userId: null, userRole: null };
+async function getOrProvisionUser(clerkUserId: string) {
+  // Find user in DB
+  const userResult = await db
+    .select()
+    .from(users)
+    .where(eq(users.clerkId, clerkUserId))
+    .limit(1);
+
+  if (userResult[0]) {
+    return userResult[0];
   }
 
-  const token = authHeader.slice(7);
-  try {
-    const parts = token.split(".");
-    if (parts.length !== 3) {
-      return { tenantId: null, userId: null, userRole: null };
-    }
+  // Not in DB (webhook missed or first login). Auto-provision.
+  console.log(`[Overview API] Auto-provisioning user ${clerkUserId}`);
+  
+  const slug = `tenant-${clerkUserId.toLowerCase().replace(/[^a-z0-9]/g, "-")}`;
+  const tenantName = "Mi Organización";
 
-    const payload = JSON.parse(
-      Buffer.from(parts[1]!, "base64").toString("utf-8"),
-    );
+  const newTenant = await db.insert(tenants).values({
+    name: tenantName,
+    slug: `${slug}-${Date.now()}`,
+    features: ["analytics", "campaigns", "playlists", "edge-nodes", "billing"],
+  }).returning();
 
-    const customTenantId = (payload.tenant_id ?? payload.org_id ?? null) as string | null;
-    const userId = (payload.sub as string) ?? null;
+  const tenantId = newTenant[0]!.id;
+  const email = `user_${clerkUserId.slice(-8)}@local.dev`;
 
-    return {
-      tenantId: customTenantId ?? (userId ? DEMO_TENANT_ID : null),
-      userId,
-      userRole: (payload.role as string) ?? null,
-    };
-  } catch {
-    return { tenantId: null, userId: null, userRole: null };
-  }
+  const newUser = await db.insert(users).values({
+    clerkId: clerkUserId,
+    tenantId: tenantId,
+    email,
+    role: "store_admin",
+  }).returning();
+
+  return newUser[0]!;
 }
 
-export async function GET(request: NextRequest) {
-  const { tenantId } = decodeToken(request);
+export async function GET(_request: NextRequest) {
+  const { userId: clerkUserId } = auth();
 
-  if (!tenantId) {
+  if (!clerkUserId) {
     return NextResponse.json({
       overview: {
         totalPlays: 0,
@@ -56,6 +63,9 @@ export async function GET(request: NextRequest) {
   }
 
   try {
+    const user = await getOrProvisionUser(clerkUserId);
+    const tenantId = user.tenantId;
+
     const dailyRows = await db
       .select({
         totalPlays: sql<number>`COALESCE(SUM(${analyticsDaily.totalPlays}), 0)`,
@@ -90,7 +100,7 @@ export async function GET(request: NextRequest) {
       ? await db
           .select({ finishedAt: syncLogs.finishedAt })
           .from(syncLogs)
-          .where(and(...storeIds.map((sid) => eq(syncLogs.storeId, sid))))
+          .where(inArray(syncLogs.storeId, storeIds))
           .orderBy(desc(syncLogs.finishedAt))
           .limit(1)
       : [];

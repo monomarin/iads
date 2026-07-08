@@ -87,10 +87,33 @@ export function Step1CreateStore({ onComplete }: Props) {
     setError("");
 
     // Extract coordinates if Google Maps link is provided
-    const { latitude, longitude } = parseCoordinates(googleMapsUrl);
+    let { latitude, longitude } = parseCoordinates(googleMapsUrl);
 
     try {
       const token = (await getToken()) || undefined;
+
+      // Geocoding Fallback: If latitude or longitude are empty, look them up using Nominatim
+      if (!latitude || !longitude) {
+        const query = googleMapsUrl.trim() || address.trim() || name.trim();
+        if (query) {
+          try {
+            const geoRes = await fetch(
+              `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1`
+            );
+            if (geoRes.ok) {
+              const geoData = await geoRes.json();
+              if (geoData && geoData[0]) {
+                latitude = geoData[0].lat;
+                longitude = geoData[0].lon;
+                console.log("Geocoded location successfully via Nominatim:", latitude, longitude);
+              }
+            }
+          } catch (geoErr) {
+            console.error("Geocoding failed:", geoErr);
+          }
+        }
+      }
+
       const storePayload = {
         name: name.trim(),
         legalName: legalName.trim() || undefined,
