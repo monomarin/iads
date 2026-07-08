@@ -7,6 +7,12 @@ export const stores = pgTable("stores", {
     .notNull()
     .references(() => tenants.id, { onDelete: "cascade" }),
   name: text("name").notNull(),
+  legalName: text("legal_name"),
+  commercialName: text("commercial_name"),
+  vertical: text("vertical"),
+  storeCode: text("store_code"),
+  latitude: text("latitude"),
+  longitude: text("longitude"),
   address: text("address"),
   timezone: text("timezone").default("UTC").notNull(),
   syncSchedule: text("sync_schedule"), // cron expression

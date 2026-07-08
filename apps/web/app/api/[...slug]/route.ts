@@ -223,13 +223,93 @@ function demoResponse(path: string) {
     });
   }
 
+  if (path.startsWith("admin/deprovision-queue")) {
+    return NextResponse.json({
+      queue: [
+        { id: "tenant-dep-1", name: "Legacy Retailer Corp", slug: "legacy-retailer", deprovision_step: "suspended", suspended_at: daysAgo(5), deletion_scheduled_at: null },
+        { id: "tenant-dep-2", name: "Expired Trial Shop", slug: "expired-trial", deprovision_step: "warning", suspended_at: daysAgo(31), deletion_scheduled_at: daysAgo(-6) },
+      ]
+    });
+  }
+
   if (path.startsWith("integrations")) {
+    if (path.endsWith("logs")) {
+      return NextResponse.json({
+        logs: [
+          { id: "log-1", event: "connected", status: "success", message: "Connected successfully", createdAt: daysAgo(1) },
+          { id: "log-2", event: "sync", status: "success", message: "Synced 42 items", createdAt: daysAgo(0) },
+          { id: "log-3", event: "alert", status: "success", message: "Verification check passed", createdAt: daysAgo(0) }
+        ]
+      });
+    }
+
     return NextResponse.json({
       integrations: [
-        { id: "int-1", name: "Slack", type: "notification", isConnected: true, config: { channel: "#alerts" } },
-        { id: "int-2", name: "Custom Webhook", type: "webhook", isConnected: true, config: { url: "https://example.com/hook" } },
-      ],
-      logs: [],
+        {
+          id: "slack",
+          name: "Slack",
+          description: "Receive notifications in Slack channels",
+          icon: "💬",
+          docs: "https://api.slack.com/",
+          installed: true,
+          integration: {
+            id: "slack-integration-id",
+            isEnabled: true,
+            config: { channel: "#alerts" },
+            lastSyncAt: daysAgo(0)
+          }
+        },
+        {
+          id: "discord",
+          name: "Discord",
+          description: "Send alerts to Discord channels via webhook",
+          icon: "🔔",
+          docs: "https://discord.com/developers/docs",
+          installed: false,
+          integration: null
+        },
+        {
+          id: "google_analytics",
+          name: "Google Analytics",
+          description: "Track audio plays as GA4 events",
+          icon: "📊",
+          docs: "https://developers.google.com/analytics",
+          installed: false,
+          integration: null
+        },
+        {
+          id: "resend",
+          name: "Resend",
+          description: "Transactional emails for invoices and alerts",
+          icon: "📧",
+          docs: "https://resend.com/docs",
+          installed: true,
+          integration: {
+            id: "resend-integration-id",
+            isEnabled: true,
+            config: { apiKey: "re_mock..." },
+            lastSyncAt: daysAgo(1)
+          }
+        },
+        {
+          id: "stripe",
+          name: "Stripe",
+          description: "Payment processing and subscription management",
+          icon: "💳",
+          docs: "https://stripe.com/docs",
+          installed: false,
+          integration: null
+        },
+        {
+          id: "zapier",
+          name: "Zapier",
+          description: "Connect with 5000+ apps via webhooks",
+          icon: "⚡",
+          docs: "https://zapier.com/",
+          installed: false,
+          integration: null
+        }
+      ]
     });
   }
 

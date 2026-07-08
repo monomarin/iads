@@ -1,6 +1,6 @@
 import { FastifyInstance } from "fastify";
 import { db, integrations, integrationLogs } from "@raemonorepo/db";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, and } from "drizzle-orm";
 import { tenantMiddleware } from "../middleware/tenant";
 
 const PROVIDERS = [
@@ -46,7 +46,12 @@ export async function integrationRoutes(app: FastifyInstance) {
     const existing = await db
       .select()
       .from(integrations)
-      .where(eq(integrations.provider, provider))
+      .where(
+        and(
+          eq(integrations.tenantId, tenantId as string),
+          eq(integrations.provider, provider)
+        )
+      )
       .limit(1);
 
     let integration;

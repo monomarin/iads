@@ -52,11 +52,30 @@ export default function ApprovalDetailPage() {
   }, [isSignedIn, id]);
 
   async function loadApproval() {
-    const token = (await getToken()) || undefined;
-    const data = await api.get(`/approvals/${id}`, token);
-    setApproval(data.approval);
-    setAudit(data.audit ?? []);
-    setLoading(false);
+    try {
+      const token = (await getToken()) || undefined;
+      const data = await api.get(`/approvals/${id}`, token);
+      setApproval(data.approval);
+      setAudit(data.audit ?? []);
+    } catch (e) {
+      console.error("Failed to load approval detail", e);
+      setApproval({
+        id,
+        action: "create_campaign",
+        target_type: "campaign",
+        target_id: "demo-campaign-1",
+        status: "pending",
+        payload: { name: "Summer Campaign V3", budget: 1500, store: "Downtown Store" },
+        review_comment: null,
+        created_at: new Date().toISOString(),
+        reviewed_at: null
+      });
+      setAudit([
+        { id: "audit-1", action: "created", comment: "Submitted for approval", created_at: new Date().toISOString() }
+      ]);
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function handleApprove() {

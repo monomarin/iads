@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, uuid, boolean } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, uuid, boolean, jsonb } from "drizzle-orm/pg-core";
 
 export const tenants = pgTable("tenants", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -6,6 +6,9 @@ export const tenants = pgTable("tenants", {
   slug: text("slug").unique().notNull(),
   logoUrl: text("logo_url"),
   isDemo: boolean("is_demo").default(false).notNull(),
+  features: jsonb("features").default(["analytics", "campaigns", "playlists", "edge-nodes", "billing"]).notNull(),
+  syncSchedule: text("sync_schedule").default("0 2 * * *"),
+  timezone: text("timezone").default("UTC"),
   suspendedAt: timestamp("suspended_at"),
   deletionScheduledAt: timestamp("deletion_scheduled_at"),
   deprovisionStep: text("deprovision_step").default("active").notNull(),

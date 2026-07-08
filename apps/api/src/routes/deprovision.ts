@@ -81,7 +81,11 @@ export async function deprovisionRoutes(app: FastifyInstance) {
     return { tenant: updated[0], message: "Tenant reactivated successfully" };
   });
 
-  app.get("/api/admin/deprovision-queue", async (_request, _reply) => {
+  app.get("/api/admin/deprovision-queue", async (request, reply) => {
+    if (request.userRole !== "super_admin") {
+      return reply.status(403).send({ error: "Forbidden: Super Admin access required" });
+    }
+
     const allTenants = await db
       .select({
         id: tenants.id,
