@@ -1,4 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@clerk/nextjs/server";
+import { db, tenants, stores, users, onboardingProgress } from "@raemonorepo/db";
+import { eq } from "drizzle-orm";
 
 function daysAgo(n: number): string {
   const d = new Date();
@@ -345,21 +348,198 @@ function demoResponse(path: string) {
   return NextResponse.json({ data: null });
 }
 
+async function getOrProvisionUser(clerkUserId: string) {
+  if (!clerkUserId) throw new Error("Unauthorized");
+
+  // Find user in DB
+  const userResult = await db
+    .select()
+    .from(users)
+    .where(eq(users.clerkId, clerkUserId))
+    .limit(1);
+
+  if (userResult[0]) {
+    return userResult[0];
+  }
+
+  // Not in DB (webhook missed or first login). Auto-provision.
+  console.log(`[NextJS API] Auto-provisioning user ${clerkUserId}`);
+  
+  const slug = `tenant-${clerkUserId.toLowerCase().replace(/[^a-z0-9]/g, "-")}`;
+  const tenantName = "Mi Organización";
+
+  const newTenant = await db.insert(tenants).values({
+    name: tenantName,
+    slug: `${slug}-${Date.now()}`,
+    features: ["analytics", "campaigns", "playlists", "edge-nodes", "billing"],
+  }).returning();
+
+  const tenantId = newTenant[0]!.id;
+  const email = `user_${clerkUserId.slice(-8)}@local.dev`;
+
+  const newUser = await db.insert(users).values({
+    clerkId: clerkUserId,
+    tenantId: tenantId,
+    email,
+    role: "store_admin",
+  }).returning();
+
+  return newUser[0]!;
+}
+
 export async function GET(_request: NextRequest, { params }: { params: { slug: string[] } }) {
   const path = params.slug?.join("/") ?? "";
+
   try {
+    // Intercept specific DB endpoints
+    if (path === "stores") {
+      const { userId: clerkUserId } = auth();
+      if (!clerkUserId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+      const user = await getOrProvisionUser(clerkUserId);
+      const storeList = await db
+        .select()
+        .from(stores)
+        .where(eq(stores.tenantId, user.tenantId));
+
+      return NextResponse.json(storeList);
+    }
+
+    if (path === "admin/stores") {
+      // Return all stores for super-admin or general interactive leaflet maps
+      const allStores = await db.select().from(stores);
+      return NextResponse.json(allStores);
+    }
+
+    if (path === "onboarding/progress") {
+      const { userId: clerkUserId } = auth();
+      if (!clerkUserId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+      const user = await getOrProvisionUser(clerkUserId);
+      const progress = await db
+        .select()
+        .from(onboardingProgress)
+        .where(eq(onboardingProgress.userId, user.id))
+        .limit(1);
+
+      if (!progress[0]) {
+        return NextResponse.json({ step: 1, completed: false, data: {} });
+      }
+
+      return NextResponse.json(progress[0]);
+    }
+
+    // Default to mock response
     return demoResponse(path);
-  } catch {
-    return NextResponse.json({ data: null });
+  } catch (err: any) {
+    console.error("API GET Error:", err);
+    return NextResponse.json({ error: err.message || "Internal Server Error" }, { status: 500 });
   }
 }
 
-export async function POST(_request: NextRequest, _context: { params: { slug: string[] } }) {
-  return NextResponse.json({ success: true });
+export async function POST(request: NextRequest, { params }: { params: { slug: string[] } }) {
+  const path = params.slug?.join("/") ?? "";
+
+  try {
+    if (path === "stores") {
+      const { userId: clerkUserId } = auth();
+      if (!clerkUserId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+      const user = await getOrProvisionUser(clerkUserId);
+      const body = await request.json();
+
+      const [newStore] = await db.insert(stores).values({
+        tenantId: user.tenantId,
+        name: body.name,
+        legalName: body.legalName,
+        commercialName: body.commercialName,
+        vertical: body.vertical,
+        storeCode: body.storeCode,
+        latitude: body.latitude,
+        longitude: body.longitude,
+        address: body.address,
+        timezone: body.timezone || "UTC",
+        syncSchedule: body.syncSchedule || body.sync_schedule,
+      }).returning();
+
+      return NextResponse.json(newStore, { status: 201 });
+    }
+
+    if (path === "onboarding/complete") {
+      const { userId: clerkUserId } = auth();
+      if (!clerkUserId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+      const user = await getOrProvisionUser(clerkUserId);
+      const [updated] = await db
+        .update(onboardingProgress)
+        .set({ completed: true, step: 0, updatedAt: new Date() })
+        .where(eq(onboardingProgress.userId, user.id))
+        .returning();
+
+      return NextResponse.json(updated || { success: true });
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (err: any) {
+    console.error("API POST Error:", err);
+    return NextResponse.json({ error: err.message || "Internal Server Error" }, { status: 500 });
+  }
 }
 
-export async function PUT(_request: NextRequest, _context: { params: { slug: string[] } }) {
-  return NextResponse.json({ success: true });
+export async function PUT(request: NextRequest, { params }: { params: { slug: string[] } }) {
+  const path = params.slug?.join("/") ?? "";
+
+  try {
+    if (path === "onboarding/progress") {
+      const { userId: clerkUserId } = auth();
+      if (!clerkUserId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+      const user = await getOrProvisionUser(clerkUserId);
+      const body = await request.json();
+
+      const existing = await db
+        .select()
+        .from(onboardingProgress)
+        .where(eq(onboardingProgress.userId, user.id))
+        .limit(1);
+
+      if (existing[0]) {
+        const mergedData = body.data
+          ? { ...(existing[0].data as Record<string, unknown>), ...body.data }
+          : existing[0].data;
+
+        const [updated] = await db
+          .update(onboardingProgress)
+          .set({
+            step: body.step ?? existing[0].step,
+            completed: body.completed ?? existing[0].completed,
+            data: mergedData,
+            updatedAt: new Date(),
+          })
+          .where(eq(onboardingProgress.id, existing[0].id))
+          .returning();
+
+        return NextResponse.json(updated);
+      }
+
+      const [created] = await db
+        .insert(onboardingProgress)
+        .values({
+          userId: user.id,
+          step: body.step || 1,
+          completed: body.completed || false,
+          data: body.data || {},
+        })
+        .returning();
+
+      return NextResponse.json(created, { status: 201 });
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (err: any) {
+    console.error("API PUT Error:", err);
+    return NextResponse.json({ error: err.message || "Internal Server Error" }, { status: 500 });
+  }
 }
 
 export async function PATCH(_request: NextRequest, _context: { params: { slug: string[] } }) {
